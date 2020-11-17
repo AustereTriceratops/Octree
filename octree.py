@@ -18,8 +18,10 @@ class Octree:
         tree.span(atoms_per_cell)
         tree.collect_leaf_nodes()
         tree.index_leaf_nodes()
+        
         tree.classify_exterior()
         tree.classify_boundary()
+        tree.classify_interior()
 
 
 class Node:
@@ -244,6 +246,11 @@ class Node:
                         for index in neighbor_indices:
                             if self.leaves[index].points:
                                 self.leaves[index].category = 'boundary'
+
+    def classify_interior(self):
+        for leaf in self.leaves:
+            if leaf.category != 'exterior' and leaf.category != 'boundary':
+                leaf.category = 'interior'
 
 
 # ============ FUNCTIONS ============

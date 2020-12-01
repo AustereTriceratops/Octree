@@ -32,8 +32,8 @@ def test_classification(deg):
     tree = Octree(points, deg, scale=2.01).tree
 
     assert len(tree.leaves) == 120
-    assert count_exterior_leaves(tree) == 56
-    assert count_boundary_leaves(tree) == 56
+    assert len(tree.exterior_cells) == 56
+    assert len(tree.boundary_cells) == 56
 
     print("classification test passed")
 

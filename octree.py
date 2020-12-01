@@ -18,7 +18,8 @@ class Octree:
         tree.span(atoms_per_cell)
         tree.collect_leaf_nodes()
         tree.index_leaf_nodes()
-        
+        tree.find_connectivity()
+
         tree.classify_exterior()
         tree.classify_boundary()
         tree.classify_interior()
@@ -32,17 +33,20 @@ class Node:
         self.children = []
         self.path = []
 
-        # unsure if this should be exclusive to root node or include all internal nodes
-        self.leaves = []
-        self.exterior_cells = []
-
         self.dimensions = None
         self.center = None
         self.depth = 0
 
+        # unsure if this should be exclusive to root node or include all internal nodes
+        self.leaves = []
+        self.exterior_cells = []
+        self.boundary_cells = []
+        self.interior_cells = []
+
         # leaf node data
         self.index = None
         self.category = None
+        self.neighbor_indices = []
 
         # this initializes the root node
         if parent is None:
@@ -204,53 +208,67 @@ class Node:
 
         return leaf_indices
 
+    def find_connectivity(self):
+        for i in range(len(self.leaves)):
+            leaf = self.leaves[i]
+            leaf.neighbor_indices = []
+
+            path = leaf.path
+            neighbor_paths = find_neighbors_at_same_depth(path)
+
+            for j in range(len(neighbor_paths)):
+                neighbor_path = neighbor_paths[j]
+                neighbor = self.follow_encoded_path(neighbor_path)
+
+                if not neighbor.children:  # if a leaf node
+                    leaf.neighbor_indices.append(neighbor.index)
+                else:
+                    main_octant = path[-1]
+                    other_octant = neighbor_path[-1]
+
+                    dim = None
+                    end_state = None
+
+                    for k in range(3):
+                        if main_octant[k] != other_octant[k]:
+                            dim = k
+                            end_state = other_octant[k]
+                            break
+
+                    neighbor_indices = neighbor.leaf_indices_along(dim, end_state)
+                    leaf.neighbor_indices.extend(neighbor_indices)
+
     # ========= CLASSIFICATION =========
 
     def classify_exterior(self):
+        self.exterior_cells = []
+
         for leaf in self.leaves:
             if not leaf.points:
                 leaf.category = 'exterior'
+                self.exterior_cells.append(leaf)
 
-    # collect leaf nodes
-    # classify empty cells
     # loop through the empty cells to find all neighboring cells
-    #
+    # classify neighboring cells appropriately
     def classify_boundary(self):  # this is a mess
-        for i in range(len(self.leaves)):
-            if self.leaves[i].category == 'exterior':
-                path = self.leaves[i].path
-                neighbor_paths = find_neighbors_at_same_depth(path)
+        self.boundary_cells = []
 
-                for j in range(len(neighbor_paths)):
-                    neighbor_path = neighbor_paths[j]
-                    neighbor = self.follow_encoded_path(neighbor_path)
+        for i in range(len(self.exterior_cells)):
+            leaf = self.exterior_cells[i]
 
-                    if not neighbor.children:  # if a leaf node
-                        if neighbor.points:
-                            neighbor.category = 'boundary'
-                    else:
-                        main_octant = path[-1]
-                        other_octant = neighbor_path[-1]
-
-                        dim = None
-                        end_state = None
-
-                        for k in range(3):
-                            if main_octant[k] != other_octant[k]:
-                                dim = k
-                                end_state = other_octant[k]
-                                break
-
-                        neighbor_indices = neighbor.leaf_indices_along(dim, end_state)
-
-                        for index in neighbor_indices:
-                            if self.leaves[index].points:
-                                self.leaves[index].category = 'boundary'
+            for index in leaf.neighbor_indices:
+                neighbor = self.leaves[index]
+                if neighbor.points and neighbor.category != 'boundary':
+                    neighbor.category = 'boundary'
+                    self.boundary_cells.append(neighbor)
 
     def classify_interior(self):
+        self.interior_cells = []
+
         for leaf in self.leaves:
             if leaf.category != 'exterior' and leaf.category != 'boundary':
                 leaf.category = 'interior'
+                self.interior_cells.append(leaf)
 
 
 # ============ FUNCTIONS ============
@@ -275,23 +293,3 @@ def find_maxima(atom_centers):
                 maxima_position[i] = pos[i]
     return maxima_position
 
-
-# move these to octree or node
-def count_exterior_leaves(tree):
-    s = 0
-
-    for leaf in tree.leaves:
-        if leaf.category == 'exterior':
-            s += 1
-
-    return s
-
-
-def count_boundary_leaves(tree):
-    s = 0
-
-    for leaf in tree.leaves:
-        if leaf.category == 'boundary':
-            s += 1
-
-    return s

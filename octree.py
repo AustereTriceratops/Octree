@@ -32,6 +32,7 @@ class Node:
         self.octant = octant
         self.children = []
         self.path = []
+        self.near_points = []
 
         self.dimensions = None
         self.center = None
